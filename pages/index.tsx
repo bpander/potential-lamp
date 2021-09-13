@@ -1,9 +1,32 @@
+import { gql, useQuery } from '@apollo/client'
 import type { NextPage } from 'next'
 import Head from 'next/head'
 import Image from 'next/image'
+import { useEffect, useState } from 'react'
 import styles from '../styles/Home.module.css'
 
+const GET_GREETING = gql`
+fragment todoFields on Todo {
+  id
+  text
+  complete
+}
+
+query Query($complete: Boolean) {
+  todos(complete: $complete) {
+    ...todoFields
+  }
+}
+`;
+
 const Home: NextPage = () => {
+  const [complete, setComplete] = useState(false);
+  const { loading, error, data, refetch } = useQuery(GET_GREETING, { variables: { complete } });
+  useEffect(() => {
+    refetch({ complete });
+  }, [refetch, complete]);
+  console.log({ data });
+
   return (
     <div className={styles.container}>
       <Head>
@@ -16,6 +39,10 @@ const Home: NextPage = () => {
         <h1 className={styles.title}>
           Welcome to <a href="https://nextjs.org">Next.js!</a>
         </h1>
+
+        <label>
+          <input type="checkbox" onChange={e => setComplete(!complete)} checked={complete} />
+        </label>
 
         <p className={styles.description}>
           Get started by editing{' '}
