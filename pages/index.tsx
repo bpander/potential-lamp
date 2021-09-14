@@ -1,40 +1,53 @@
-import { gql, useLazyQuery } from '@apollo/client'
+import { gql, useMutation, useQuery } from '@apollo/client'
 import type { NextPage } from 'next'
 import Link from 'next/link';
 import Head from 'next/head'
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import styles from '../styles/Home.module.css'
 import { useRouter } from 'next/dist/client/router';
 
-const GET_TODOS = gql`
+const TODO_FIELDS = gql`
 fragment todoFields on Todo {
   id
   text
   complete
 }
+`;
 
-query Query($complete: Boolean) {
+const GET_TODOS = gql`
+${TODO_FIELDS}
+query GetTodos($complete: Boolean) {
   todos(complete: $complete) {
     ...todoFields
   }
 }
 `;
 
+const UPDATE_TODO = gql`
+${TODO_FIELDS}
+mutation UpdateTodo($id: ID!, $input: TodoInput!) {
+  updateTodo(id: $id, input: $input) {
+    ...todoFields
+  }
+}
+`;
+
 const Home: NextPage = () => {
-  const { query, isReady } = useRouter();
-  const complete = useMemo(() => {
-    switch (query.complete) {
-      case 'active': return false;
-      case 'complete': return true;
-      default: return null;
+  const { query } = useRouter();
+  const { loading, error, data } = useQuery(GET_TODOS);
+
+  const [updateTodo] = useMutation(UPDATE_TODO, {
+    optimisticResponse: ({ id, input }) => ({ updateTodo: { id, ...input } }),
+  });
+
+  const filteredTodos = useMemo(() => {
+    if (!data?.todos) { return []; }
+    if (!query.complete) {
+      return data.todos;
     }
-  }, [query.complete]);
-  const [getTodos, { loading, error, data }] = useLazyQuery(GET_TODOS, { variables: { complete } });
-  useEffect(() => {
-    if (isReady) {
-      getTodos({ variables: { complete } });
-    }
-  }, [getTodos, complete, isReady]);
+    const complete = query.complete === 'complete';
+    return data.todos.filter(x => x.complete === complete);
+  }, [data, query.complete]);
 
   return (
     <div className={styles.container}>
@@ -56,9 +69,11 @@ const Home: NextPage = () => {
         </Link>
 
         <ul>
-          {data?.todos.map(todo => (
-            <li key={todo.id}>
-              <input type="checkbox" checked={todo.complete} onChange={() => {}} />
+          {filteredTodos.map(({ id, ...todo }) => (
+            <li key={id}>
+              <input type="checkbox" checked={todo.complete} onChange={() => {
+                updateTodo({ variables: { id, input: { ...todo, complete: !todo.complete } } });
+              }} />
               {todo.text}
             </li>
           ))}
