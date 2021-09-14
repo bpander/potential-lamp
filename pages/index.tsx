@@ -32,12 +32,30 @@ mutation UpdateTodo($id: ID!, $input: TodoInput!) {
 }
 `;
 
+const DELETE_TODO = gql`
+mutation DeleteTodo($id: ID!) {
+  deleteTodo(id: $id)
+}
+`;
+
 const Home: NextPage = () => {
   const { query } = useRouter();
   const { loading, error, data } = useQuery(GET_TODOS);
 
   const [updateTodo] = useMutation(UPDATE_TODO, {
     optimisticResponse: ({ id, input }) => ({ updateTodo: { id, ...input } }),
+  });
+
+  const [deleteTodo] = useMutation(DELETE_TODO, {
+    optimisticResponse: ({ id }) => ({ deleteTodo: id }),
+    update: (cache, { data: { deleteTodo } }) => {
+      const { todos } = cache.readQuery({ query: GET_TODOS });
+      const todo = todos.find(x => x.id === deleteTodo);
+      if (todo) {
+        cache.evict({ id: cache.identify(todo) });
+        cache.gc();
+      }
+    },
   });
 
   const filteredTodos = useMemo(() => {
@@ -75,6 +93,7 @@ const Home: NextPage = () => {
                 updateTodo({ variables: { id, input: { ...todo, complete: !todo.complete } } });
               }} />
               {todo.text}
+              <button onClick={() => deleteTodo({ variables: { id } })}>delete</button>
             </li>
           ))}
         </ul>
