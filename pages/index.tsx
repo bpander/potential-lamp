@@ -1,11 +1,12 @@
-import { gql, useQuery } from '@apollo/client'
+import { gql, useLazyQuery } from '@apollo/client'
 import type { NextPage } from 'next'
+import Link from 'next/link';
 import Head from 'next/head'
-import Image from 'next/image'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import styles from '../styles/Home.module.css'
+import { useRouter } from 'next/dist/client/router';
 
-const GET_GREETING = gql`
+const GET_TODOS = gql`
 fragment todoFields on Todo {
   id
   text
@@ -20,12 +21,20 @@ query Query($complete: Boolean) {
 `;
 
 const Home: NextPage = () => {
-  const [complete, setComplete] = useState(false);
-  const { loading, error, data, refetch } = useQuery(GET_GREETING, { variables: { complete } });
+  const { query, isReady } = useRouter();
+  const complete = useMemo(() => {
+    switch (query.complete) {
+      case 'active': return false;
+      case 'complete': return true;
+      default: return null;
+    }
+  }, [query.complete]);
+  const [getTodos, { loading, error, data }] = useLazyQuery(GET_TODOS, { variables: { complete } });
   useEffect(() => {
-    refetch({ complete });
-  }, [refetch, complete]);
-  console.log({ data });
+    if (isReady) {
+      getTodos({ variables: { complete } });
+    }
+  }, [getTodos, complete, isReady]);
 
   return (
     <div className={styles.container}>
@@ -36,62 +45,26 @@ const Home: NextPage = () => {
       </Head>
 
       <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
+        <Link replace href="/">
+          All
+        </Link>
+        <Link replace href={'/active'}>
+          Active
+        </Link>
+        <Link replace href={'/complete'}>
+          Complete
+        </Link>
 
-        <label>
-          <input type="checkbox" onChange={e => setComplete(!complete)} checked={complete} />
-        </label>
-
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.js</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h2>Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h2>Learn &rarr;</h2>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/master/examples"
-            className={styles.card}
-          >
-            <h2>Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
-        </div>
+        <ul>
+          {data?.todos.map(todo => (
+            <li key={todo.id}>
+              <input type="checkbox" checked={todo.complete} onChange={() => {}} />
+              {todo.text}
+            </li>
+          ))}
+        </ul>
       </main>
 
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <span className={styles.logo}>
-            <Image src="/vercel.svg" alt="Vercel Logo" width={72} height={16} />
-          </span>
-        </a>
-      </footer>
     </div>
   )
 }
