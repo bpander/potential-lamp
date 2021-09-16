@@ -2,9 +2,9 @@ import { gql, useMutation, useQuery } from '@apollo/client'
 import type { NextPage } from 'next'
 import Link from 'next/link';
 import Head from 'next/head'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/dist/client/router';
-import { Container, Button, Link as MuiLink } from '@material-ui/core'
+import { Container, Button, Link as MuiLink, Input, TextField } from '@material-ui/core'
 import { makeStyles, createStyles } from '@material-ui/core/styles'
 
 const useStyles = makeStyles(theme => createStyles({
@@ -30,6 +30,15 @@ query GetTodos($complete: Boolean) {
 }
 `;
 
+const ADD_TODO = gql`
+${TODO_FIELDS}
+mutation AddTodo($input: TodoInput!) {
+  addTodo(input: $input) {
+    ...todoFields
+  }
+}
+`;
+
 const UPDATE_TODO = gql`
 ${TODO_FIELDS}
 mutation UpdateTodo($id: ID!, $input: TodoInput!) {
@@ -49,6 +58,11 @@ const Home: NextPage = () => {
   const classes = useStyles();
   const { query, asPath } = useRouter();
   const { loading, error, data } = useQuery(GET_TODOS);
+  const [draftTodo, setDraftTodo] = useState('');
+
+  const [addTodo, { loading: addingTodo }] = useMutation(ADD_TODO, {
+    refetchQueries: [GET_TODOS],
+  });
 
   const [updateTodo] = useMutation(UPDATE_TODO, {
     optimisticResponse: ({ id, input }) => ({ updateTodo: { id, ...input } }),
@@ -99,6 +113,23 @@ const Home: NextPage = () => {
             Complete
           </MuiLink>
         </Link>
+
+        <form onSubmit={async e => {
+          e.preventDefault();
+          const { errors } = await addTodo({ variables: { input: { text: draftTodo, complete: false } } });
+          if (!errors) {
+            setDraftTodo('');
+          }
+        }}>
+          <TextField
+            label="Add todo"
+            value={draftTodo}
+            onChange={e => setDraftTodo(e.currentTarget.value)}
+          />
+          <Button type="submit" variant="contained" color="primary" disabled={addingTodo || draftTodo.trim() === ''}>
+            Add
+          </Button>
+        </form>
 
         <ul>
           {filteredTodos.map(({ id, ...todo }) => (
