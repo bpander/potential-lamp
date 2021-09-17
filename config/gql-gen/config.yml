@@ -1,0 +1,23 @@
+schema: http://localhost:4000
+overwrite: true
+generates:
+  ./types/graphql-types.tsx:
+    documents:
+      - ./queries/**.tsx
+      - ./mutations/**.tsx
+      - ./fragments/**.tsx
+    config:
+      withHooks: true
+      withHOC: false
+      reactApolloImportFrom: '../react-apollo'
+      reactApolloVersion: 3
+      apolloReactCommonImportFrom: '@apollo/react-common'
+      apolloReactComponentsImportFrom: '@apollo/react-components'
+      apolloReactHooksImportFrom: '@apollo/react-hooks'
+      scalars:
+        Date: number
+    plugins:
+      - add: "/**\n * THIS IS A GENERATED FILE, DO NOT MODIFY DIRECTLY\n */\n"
+      - typescript
+      - typescript-operations
+      - typescript-react-apollo

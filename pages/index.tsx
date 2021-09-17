@@ -1,11 +1,12 @@
-import { gql, useMutation, useQuery } from '@apollo/client'
 import type { NextPage } from 'next'
 import Link from 'next/link';
 import Head from 'next/head'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/dist/client/router';
-import { Container, Button, Link as MuiLink, Input, TextField } from '@material-ui/core'
+import { Container, Button, Link as MuiLink, TextField } from '@material-ui/core'
 import { makeStyles, createStyles } from '@material-ui/core/styles'
+import { GetTodosQuery, useAddTodoMutation, useDeleteTodoMutation, useGetTodosQuery, useUpdateTodoMutation } from '../types/graphql-types';
+import { GET_TODOS } from '../queries/TodosQuery';
 
 const useStyles = makeStyles(theme => createStyles({
   linkActive: {
@@ -13,66 +14,23 @@ const useStyles = makeStyles(theme => createStyles({
   },
 }));
 
-const TODO_FIELDS = gql`
-fragment todoFields on Todo {
-  id
-  text
-  complete
-}
-`;
-
-const GET_TODOS = gql`
-${TODO_FIELDS}
-query GetTodos($complete: Boolean) {
-  todos(complete: $complete) {
-    ...todoFields
-  }
-}
-`;
-
-const ADD_TODO = gql`
-${TODO_FIELDS}
-mutation AddTodo($input: TodoInput!) {
-  addTodo(input: $input) {
-    ...todoFields
-  }
-}
-`;
-
-const UPDATE_TODO = gql`
-${TODO_FIELDS}
-mutation UpdateTodo($id: ID!, $input: TodoInput!) {
-  updateTodo(id: $id, input: $input) {
-    ...todoFields
-  }
-}
-`;
-
-const DELETE_TODO = gql`
-mutation DeleteTodo($id: ID!) {
-  deleteTodo(id: $id)
-}
-`;
-
 const Home: NextPage = () => {
   const classes = useStyles();
   const { query, asPath } = useRouter();
-  const { loading, error, data } = useQuery(GET_TODOS);
   const [draftTodo, setDraftTodo] = useState('');
 
-  const [addTodo, { loading: addingTodo }] = useMutation(ADD_TODO, {
-    refetchQueries: [GET_TODOS],
+  const { data } = useGetTodosQuery();
+  const [addTodo, { loading: addingTodo }] = useAddTodoMutation({ refetchQueries: [{ query: GET_TODOS }] });
+  const [updateTodo] = useUpdateTodoMutation({
+    optimisticResponse: ({ id, input }) => ({ updateTodo: { id, ...input, complete: Boolean(input.complete) } }),
   });
 
-  const [updateTodo] = useMutation(UPDATE_TODO, {
-    optimisticResponse: ({ id, input }) => ({ updateTodo: { id, ...input } }),
-  });
-
-  const [deleteTodo] = useMutation(DELETE_TODO, {
+  const [deleteTodo] = useDeleteTodoMutation({
     optimisticResponse: ({ id }) => ({ deleteTodo: id }),
-    update: (cache, { data: { deleteTodo } }) => {
-      const { todos } = cache.readQuery({ query: GET_TODOS }) || { todos: [] };
-      const todo = todos.find(x => x.id === deleteTodo);
+    update: (cache, { data }) => {
+      const deletedTodoId = data?.deleteTodo;
+      const getTodosQuery = cache.readQuery<GetTodosQuery>({ query: GET_TODOS });
+      const todo = getTodosQuery?.todos?.find(x => x.id === deletedTodoId);
       if (todo) {
         cache.evict({ id: cache.identify(todo) });
         cache.gc();
